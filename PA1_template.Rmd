@@ -1,0 +1,144 @@
+---
+title: "PA1_template.Rmd"
+output: html_document
+---
+This is for Reproducible Research Course Project1
+
+##1. Loading and preprocessing the data
+
+```{r CACHE = TRUE}
+setwd("/Users/wanhaochi/Desktop/Coursera/reproducible research/courseproject1")
+data <- read.csv("activity.csv")
+## take a first look at the data
+summary(data)
+str(data)
+
+#pre-processing the data
+data$seq <- rep(c(1:61),each = 288)
+data$time <- rep(c(1:288),61)
+data1 <- na.omit(data)
+#change the format 
+data1$interval0 <- formatC(data1$interval,width=4,format="d",flag="0")
+data1$interval1 <-paste(data1$date,data$interval0)
+data1$interval1 <- strptime(data1$interval1,"%Y-%m-%d %H%M")
+data1$interval2 <- strptime(data1$interval0, "%H%M")
+
+```
+
+##2. What is mean total number of steps taken per day?
+
+```{r CACHE = TRUE}
+# Calculate the total number of steps taken each day
+sum <- with(data1,
+            tapply(X=steps,INDEX=seq,FUN=sum,simpilfy = T))
+
+# Make a histogram of the total number of steps taken each day
+hist(sum,xlab="Total number of steps",main = "Histogram of the total number of steps taken each day")
+# Calculate and report the mean and median total number of steps taken each day
+mean <- mean(sum)
+median <- median(sum)
+```
+
+The mean total number of steps taken per day is `r mean`.
+The median total number of steps taken per day is `r median`.
+
+##3. What is the average daily activity pattern?
+
+``` {r CACHE = TRUE}
+mean_interval <- with(data1,
+                      tapply(X=steps,INDEX=time,FUN=mean,simpilfy = T))
+
+plot(unique(data1$interval2),mean_interval,type="l",xlab="Time",ylab="Steps",main="Averaged daily activity")
+
+max <- which.max(mean_interval)
+spot <- unique(data1$interval2)
+x <- substr(spot[max],start =12, stop =19)
+
+```
+
+`r x` 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps.
+
+##4.Imputting missing values
+
+```{r CACHE = TRUE}
+#Calculate and report the total number of missing values in the dataset
+table(complete.cases(data))
+```
+
+The total number of missing values in the datasheet is 2304.
+
+```{r CACHE = TRUE}
+#Fill in all of the missing values with mean value of that 5-min interval in the datasheet.
+data2 <- data.frame()
+for (i in 1:288) {
+    timesub <- subset(data,data$time == i)
+    timesub$steps[is.na(timesub$steps)] <- mean_interval[i]
+    data2 <- rbind(data2,timesub)
+}
+
+#double check the data after imputing the missing data
+table(complete.cases(data2))
+
+str(data2)
+
+# Calculate the total number of steps taken each day in the new dataset
+sum2 <- with(data2,
+            tapply(X=steps,INDEX=seq,FUN=sum,simpilfy = T))
+
+# Make a histogram of the total number of steps taken each day
+hist(sum2,xlab="Total number of steps",main = "Histogram of the total number of steps taken each day")
+
+# Calculate and report the mean and median total number of steps taken each day
+mean2 <- mean(sum2)
+median2 <- median(sum2)
+```
+
+The mean total number of steps taken per day after imputing the missing data is `r mean2` and before imputing the missing data is `r mean`.
+The median total number of steps taken per day after imputing the missing data is `r median2` and before imputing the missing data is `r median`.
+
+##5.Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+
+#change the format
+data2$interval0 <- formatC(data2$interval,width=4,format="d",flag="0")
+data2$interval <-paste(data2$date,data2$interval0)
+data2$interval <- strptime(data2$interval,"%Y-%m-%d %H%M")
+data2$interval1 <- strptime(data2$interval0, "%H%M")
+data2$date <- strptime(data2$date, "%Y-%m-%d")
+data2$day <- weekdays(data2$date)
+weekday <- rep("weekday",5)
+weekend <- rep("weekend",2)
+
+#Create a new factor variable in the dataset with two levels
+data2$weekday <- as.factor(c(rep(c(weekday,weekend),8),weekday))
+
+# Calculate mean for weekday and weekend
+
+data2_weekday <- subset(data2,data2$weekday == "weekday")
+data2_weekend <- subset(data2,data2$weekday == "weekend")
+
+mean_interval_weekday <- with(data2_weekday,
+tapply(X=steps,INDEX=time,FUN=mean,simpilfy = T))
+
+mean_interval_weekend <- with(data2_weekend,
+tapply(X=steps,INDEX=time,FUN=mean,simpilfy = T))
+#prepare data for plotting
+mean_new <- data.frame(mean_interval_weekday,mean_interval_weekend,time = unique(data2$interval1))
+mean_long <- with(mean_new,
+                  rbind(data.frame(Day = "weekday",Time = time, Steps = mean_interval_weekday),
+                        data.frame(Day = "weekend",Time=time,Steps = mean_interval_weekend))
+)
+
+#Plotting
+library(ggplot2)
+library(scales)
+f1 = ggplot(data = mean_long, aes(x = Time, y = Steps,colour = Day) ) +
+            geom_line() +
+            facet_grid(Day ~ .)+
+            ylab("Number of Steps")+
+            scale_x_datetime(breaks=date_breaks("3 hour"),labels = date_format("%H:%M"))
+
+print(f1)
+
+
